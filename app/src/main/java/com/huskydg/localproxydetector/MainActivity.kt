@@ -4,20 +4,43 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,26 +50,51 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.sp
+import com.huskydg.localproxydetector.netif.InterfaceReport
+import com.huskydg.localproxydetector.netif.NetworkInterfaceScanner
+import com.huskydg.localproxydetector.netif.NetworkScanResult
 import com.huskydg.localproxydetector.probe.IfconfigClient
 import com.huskydg.localproxydetector.probe.ProxyEndpoint
 import com.huskydg.localproxydetector.probe.ProxyScanner
 import com.huskydg.localproxydetector.probe.ProxyType
 import com.huskydg.localproxydetector.probe.ScanMode
+import com.huskydg.localproxydetector.probe.ScanPhase
 import com.huskydg.localproxydetector.probe.ScanProgress
-import com.huskydg.localproxydetector.netif.InterfaceReport
-import com.huskydg.localproxydetector.netif.NetworkInterfaceScanner
-import com.huskydg.localproxydetector.netif.NetworkScanResult
+import com.huskydg.localproxydetector.ui.components.AccentRow
+import com.huskydg.localproxydetector.ui.components.Badge
+import com.huskydg.localproxydetector.ui.components.CategoryCard
+import com.huskydg.localproxydetector.ui.components.ControlButton
+import com.huskydg.localproxydetector.ui.components.DashTitle
+import com.huskydg.localproxydetector.ui.components.ExpandRow
+import com.huskydg.localproxydetector.ui.components.InfoRow
+import com.huskydg.localproxydetector.ui.components.MagicIcons
+import com.huskydg.localproxydetector.ui.components.MagicTextField
+import com.huskydg.localproxydetector.ui.components.MutedText
+import com.huskydg.localproxydetector.ui.components.Notice
+import com.huskydg.localproxydetector.ui.components.NoticeKind
+import com.huskydg.localproxydetector.ui.components.SectionCaption
+import com.huskydg.localproxydetector.ui.components.SettingsGroup
+import com.huskydg.localproxydetector.ui.components.StatusChip
+import com.huskydg.localproxydetector.ui.components.StatusKind
+import com.huskydg.localproxydetector.ui.components.SwitchRow
 import com.huskydg.localproxydetector.ui.theme.LocalProxyDetectorTheme
+import com.huskydg.localproxydetector.ui.theme.MagicTheme
+import com.huskydg.localproxydetector.ui.theme.MonoFamily
 import com.huskydg.localproxydetector.xray.XrayApiScanResult
 import com.huskydg.localproxydetector.xray.XrayApiScanner
+import com.huskydg.localproxydetector.xray.XrayOutboundSummary
 import com.huskydg.localproxydetector.xray.XrayScanProgress
-import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,14 +102,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             LocalProxyDetectorTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MainScreen(modifier = Modifier.padding(innerPadding))
-                }
+                MainScreen()
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MainScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
@@ -71,6 +118,7 @@ private fun MainScreen(modifier: Modifier = Modifier) {
 
     var automaticMode by rememberSaveable { mutableStateOf(true) }
     var manualPortText by rememberSaveable { mutableStateOf("1080") }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
 
     var scanJob by remember { mutableStateOf<Job?>(null) }
     var directJob by remember { mutableStateOf<Job?>(null) }
@@ -213,253 +261,450 @@ private fun MainScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(
+    val status = proxyStatus(foundEndpoint, direct, viaProxy, scanning, hasTested)
+    val endpointNow = foundEndpoint
+    val subtitle = when {
+        !hasTested -> "Tap Start to scan localhost"
+        scanning -> "Scanning localhost\u2026"
+        endpointNow != null -> "${endpointNow.type.toUiText()} \u2022 ${formatHostPort(endpointNow.host, endpointNow.port)}"
+        else -> "No proxy found on localhost"
+    }
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .background(MaterialTheme.colorScheme.surface),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        Text(
-            text = "Per-app split tunnel bypass",
-            style = MaterialTheme.typography.titleLarge,
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+        Column(
+            modifier = Modifier
+                .widthIn(max = 600.dp)
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)),
         ) {
-            Text("Automatic scan")
-            Switch(
-                checked = automaticMode,
-                onCheckedChange = { if (!running) automaticMode = it },
-                enabled = !running,
+            AppHeader(
+                status = status,
+                subtitle = subtitle,
+                running = running,
+                onStart = { start() },
+                onStop = { stop() },
+                onInfo = { showAbout = true },
             )
-        }
 
-        if (!automaticMode) {
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = manualPortText,
-                onValueChange = { manualPortText = it.filter { ch -> ch.isDigit() }.take(5) },
-                enabled = !running,
-                label = { Text("Port (localhost)") },
-                singleLine = true,
-            )
-        }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .imePadding()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                DashTitle("Detection", Modifier.padding(start = 4.dp, top = 4.dp))
 
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { if (running) stop() else start() },
-        ) {
-            Text(if (running) "Stop" else "Start")
-        }
-
-        if (progress != null && scanning) {
-            val p = progress!!
-            val percent = if (p.total > 0) (p.scanned * 100 / p.total) else 0
-            val label = when (p.phase) {
-                com.huskydg.localproxydetector.probe.ScanPhase.POPULAR_PORTS -> "Popular ports"
-                com.huskydg.localproxydetector.probe.ScanPhase.LOW_PORTS -> "Low ports 1-1023"
-                com.huskydg.localproxydetector.probe.ScanPhase.FULL_RANGE -> "Full scan 1024-65535"
-            }
-            Text("$label: ${p.scanned}/${p.total} ($percent%), port ${p.currentPort}")
-        }
-
-        StatusBlock(
-            endpoint = foundEndpoint,
-            direct = direct,
-            viaProxy = viaProxy,
-            scanning = scanning,
-            hasTested = hasTested,
-        )
-
-        if (foundEndpoint != null) {
-            val ep = foundEndpoint!!
-            Text("Proxy: ${ep.type.toUiText()} ${formatHostPort(ep.host, ep.port)}")
-        }
-
-        Text("Direct IP: ${direct.toUiText()}")
-        Text("IP via proxy: ${viaProxy.toUiText()}")
-
-        if (errorText != null) {
-            Text(
-                text = "Error: $errorText",
-                color = Color(0xFFD32F2F),
-            )
-        }
-
-        if (xrayProgress != null && xrayJob != null) {
-            val p = xrayProgress!!
-            val percent = if (p.total > 0) (p.scanned * 100 / p.total) else 0
-            Text("Xray API scan: ${p.scanned}/${p.total} ($percent%), ${formatHostPort(p.host, p.currentPort)}")
-        }
-
-        XrayApiStatusBlock(
-            hasTested = hasTested,
-            scanning = xrayJob != null,
-            api = xrayApi,
-        )
-
-        if (xrayApi != null) {
-            val api = xrayApi!!
-            Text("Xray API: ${formatHostPort(api.endpoint.host, api.endpoint.port)}")
-            Text("Outbounds: ${api.outbounds.size}")
-            api.outbounds.take(20).forEach { outbound ->
-                val protocolName = outbound.protocolName ?: "-"
-                val addressPort = if (outbound.address != null && outbound.port != null) {
-                    "${outbound.address}:${outbound.port}"
-                } else {
-                    "-"
+                // ── Scan settings ──
+                SettingsGroup(title = "Scan settings") {
+                    SwitchRow(
+                        title = "Automatic scan",
+                        description = "Look for the local proxy port yourself: popular ports first, then the full range.",
+                        checked = automaticMode,
+                        onCheckedChange = { if (!running) automaticMode = it },
+                        enabled = !running,
+                    )
+                    if (!automaticMode) {
+                        Spacer(Modifier.height(16.dp))
+                        MagicTextField(
+                            value = manualPortText,
+                            onValueChange = { manualPortText = it.filter { ch -> ch.isDigit() }.take(5) },
+                            label = "Port (localhost)",
+                            enabled = !running,
+                        )
+                    }
                 }
-                val uuid = outbound.uuid ?: "-"
-                val sni = outbound.sni ?: "-"
-                val publicKey = outbound.publicKey ?: "-"
 
-                Text("Outbound '${outbound.tag}'")
-                Text("protocolName: $protocolName")
-                Text("address:port: $addressPort")
-                Text("uuid: $uuid")
-                Text("reality sni: $sni")
-                Text("reality publicKey: $publicKey")
-            }
-            if (api.outbounds.size > 20) {
-                Text("...and ${api.outbounds.size - 20} more")
+                // ── Local proxy ──
+                CategoryCard(
+                    title = "Local proxy",
+                    trailing = { StatusChip(status.text, status.kind, small = true) },
+                ) {
+                    val p = progress
+                    if (p != null && scanning) {
+                        val label = when (p.phase) {
+                            ScanPhase.POPULAR_PORTS -> "Popular ports"
+                            ScanPhase.LOW_PORTS -> "Low ports 1-1023"
+                            ScanPhase.FULL_RANGE -> "Full scan 1024-65535"
+                        }
+                        ScanProgressRow(label, p.scanned, p.total, "port ${p.currentPort}")
+                    }
+                    InfoRow(
+                        label = "Proxy",
+                        value = when {
+                            endpointNow != null -> "${endpointNow.type.toUiText()} ${formatHostPort(endpointNow.host, endpointNow.port)}"
+                            !hasTested -> "-"
+                            scanning -> "scanning..."
+                            else -> "not found"
+                        },
+                    )
+                    InfoRow(
+                        label = "Direct IP",
+                        value = direct.toUiText(),
+                        mono = direct.ip != null,
+                        valueColor = direct.color(),
+                    )
+                    InfoRow(
+                        label = "IP via proxy",
+                        value = viaProxy.toUiText(),
+                        mono = viaProxy.ip != null,
+                        valueColor = viaProxy.color(),
+                        divider = false,
+                    )
+                    errorText?.let {
+                        Notice("Error: $it", Modifier.padding(12.dp), NoticeKind.Error)
+                    }
+                }
+
+                // ── Xray API ──
+                val api = xrayApi
+                val xrayChip = when {
+                    !hasTested -> UiStatus("Not tested", StatusKind.Neutral)
+                    xrayJob != null -> UiStatus("Scanning", StatusKind.Busy)
+                    api != null -> UiStatus("Found", StatusKind.Active)
+                    else -> UiStatus("Not found", StatusKind.Inactive)
+                }
+                CategoryCard(
+                    title = "Xray API",
+                    trailing = { StatusChip(xrayChip.text, xrayChip.kind, small = true) },
+                ) {
+                    val xp = xrayProgress
+                    if (xp != null && xrayJob != null) {
+                        ScanProgressRow(
+                            label = "Xray API scan",
+                            scanned = xp.scanned,
+                            total = xp.total,
+                            detail = formatHostPort(xp.host, xp.currentPort),
+                        )
+                    }
+                    if (api != null) {
+                        InfoRow("Endpoint", formatHostPort(api.endpoint.host, api.endpoint.port), mono = true)
+                        InfoRow("Outbounds", api.outbounds.size.toString(), divider = api.outbounds.isNotEmpty())
+                        api.outbounds.take(20).forEachIndexed { index, outbound ->
+                            OutboundItem(outbound, divider = index < minOf(api.outbounds.size, 20) - 1 || api.outbounds.size > 20)
+                        }
+                        if (api.outbounds.size > 20) {
+                            MutedText("...and ${api.outbounds.size - 20} more")
+                        }
+                    } else if (xrayJob == null) {
+                        MutedText(if (hasTested) "No Xray API found on localhost." else "Not tested yet.")
+                    }
+                    xrayErrorText?.let {
+                        Notice("Xray API error: $it", Modifier.padding(12.dp), NoticeKind.Error)
+                    }
+                }
+
+                // ── Network interfaces ──
+                NetworkInterfaceCard(
+                    hasTested = hasTested,
+                    scanning = netifJob != null,
+                    result = netifResult,
+                    errorText = netifErrorText,
+                )
+
+                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
         }
+    }
 
-        if (xrayErrorText != null) {
-            Text(
-                text = "Xray API error: $xrayErrorText",
-                color = Color(0xFFD32F2F),
-            )
-        }
-
-        NetworkInterfaceBlock(
-            hasTested = hasTested,
-            scanning = netifJob != null,
-            result = netifResult,
-            errorText = netifErrorText,
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            containerColor = MagicTheme.colors.surface3,
+            title = { Text("Proxy Detector", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Checks whether other apps on this device can reach a local SOCKS5/HTTP proxy " +
+                        "(the \"localhost attack\"), whether an Xray API is exposed and leaks your " +
+                        "outbound config, and which VPN / tunnel interfaces are visible.\n\n" +
+                        "Tip: run proxies with random credentials on every device.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp,
+                )
+            },
+            confirmButton = { TextButton(onClick = { showAbout = false }) { Text("Close") } },
         )
     }
 }
 
+// ───────────────────────── Header (app bar + status + Start/Stop) ─────────────────────────
+
 @Composable
-private fun NetworkInterfaceBlock(
+private fun AppHeader(
+    status: UiStatus,
+    subtitle: String,
+    running: Boolean,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onInfo: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.app_logo),
+                contentDescription = null,
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)),
+            )
+            Text(
+                text = "Proxy Detector",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MagicTheme.colors.surface3)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    .clickable(onClick = onInfo),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = MagicIcons.Info,
+                    contentDescription = "About",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            StatusChip(text = "Status: ${status.text}", kind = status.kind)
+            Text(
+                text = subtitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ControlButton("Start", isStop = false, enabled = !running, onClick = onStart, modifier = Modifier.weight(1f))
+            ControlButton("Stop", isStop = true, enabled = running, onClick = onStop, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun ScanProgressRow(label: String, scanned: Int, total: Int, detail: String) {
+    val fraction = if (total > 0) (scanned.toFloat() / total).coerceIn(0f, 1f) else 0f
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(
+                "$scanned/$total (${(fraction * 100).toInt()}%)",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                fontFamily = MonoFamily,
+            )
+        }
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MagicTheme.colors.surface4,
+        )
+        Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontFamily = MonoFamily)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+// ───────────────────────── Xray outbound row ─────────────────────────
+
+@Composable
+private fun OutboundItem(outbound: XrayOutboundSummary, divider: Boolean) {
+    val addressPort = if (outbound.address != null && outbound.port != null) {
+        "${outbound.address}:${outbound.port}"
+    } else {
+        "-"
+    }
+    AccentRow(accent = MaterialTheme.colorScheme.error, divider = divider) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = outbound.tag,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Badge(outbound.protocolName ?: "-")
+        }
+        SelectionContainer {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                MetaLine("address:port", addressPort)
+                MetaLine("uuid", outbound.uuid ?: "-")
+                MetaLine("reality sni", outbound.sni ?: "-")
+                MetaLine("reality publicKey", outbound.publicKey ?: "-")
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetaLine(label: String, value: String) {
+    Text(
+        text = "$label: $value",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontSize = 12.sp,
+        fontFamily = MonoFamily,
+        lineHeight = 17.sp,
+    )
+}
+
+// ───────────────────────── Network interfaces card ─────────────────────────
+
+@Composable
+private fun NetworkInterfaceCard(
     hasTested: Boolean,
     scanning: Boolean,
     result: NetworkScanResult?,
     errorText: String?,
 ) {
-    val (vpnText, vpnColor) = when {
-        !hasTested -> "VPN transport: not tested yet" to Color(0xFF9E9E9E)
-        scanning -> "VPN transport: scanning..." to Color.Unspecified
-        result == null -> "VPN transport: unknown" to Color(0xFF9E9E9E)
-        result.vpnStatus.vpnActive ->
-            "VPN transport: ACTIVE (${result.vpnStatus.transportNetworkCount} network" +
-                (if (result.vpnStatus.transportNetworkCount != 1) "s" else "") +
-                if (result.vpnStatus.underlyingInterfaceNames.isNotEmpty()) {
-                    ", ${result.vpnStatus.underlyingInterfaceNames.joinToString(", ")})"
-                } else {
-                    ")"
-                } to Color(0xFF388E3C)
-        else -> "VPN transport: none reported by the OS" to Color(0xFFD32F2F)
+    val (chip, detail) = when {
+        !hasTested -> UiStatus("Not tested", StatusKind.Neutral) to "not tested yet"
+        scanning -> UiStatus("Scanning", StatusKind.Busy) to "scanning..."
+        result == null -> UiStatus("Unknown", StatusKind.Neutral) to "unknown"
+        result.vpnStatus.vpnActive -> {
+            val n = result.vpnStatus.transportNetworkCount
+            val ifaces = result.vpnStatus.underlyingInterfaceNames
+            UiStatus("VPN active", StatusKind.Active) to
+                "ACTIVE ($n network${if (n != 1) "s" else ""}" +
+                (if (ifaces.isNotEmpty()) ", ${ifaces.joinToString(", ")})" else ")")
+        }
+        else -> UiStatus("No VPN", StatusKind.Inactive) to "none reported by the OS"
     }
 
-    Text(
-        text = vpnText,
-        color = vpnColor,
-        style = MaterialTheme.typography.titleMedium,
-    )
+    var showOthers by rememberSaveable { mutableStateOf(false) }
 
-    if (result != null) {
-        val suspicious = result.suspiciousInterfaces
-        if (suspicious.isNotEmpty()) {
-            Text(
-                text = "Suspicious interfaces (${suspicious.size}):",
-                color = Color(0xFFD32F2F),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            suspicious.forEach { Text(it.toUiLine(), color = Color(0xFFD32F2F)) }
-        } else {
-            Text("No tun/wg/tailscale-like interfaces found", color = Color(0xFF388E3C))
+    CategoryCard(
+        title = "Network interfaces",
+        trailing = { StatusChip(chip.text, chip.kind, small = true) },
+    ) {
+        InfoRow("VPN transport", detail, divider = result != null)
+
+        if (result != null) {
+            val suspicious = result.suspiciousInterfaces
+            if (suspicious.isNotEmpty()) {
+                SectionCaption("Suspicious interfaces (${suspicious.size})", color = MaterialTheme.colorScheme.error)
+                suspicious.forEachIndexed { i, r -> InterfaceItem(r, divider = i < suspicious.size - 1) }
+            } else {
+                Notice(
+                    "No tun/wg/tailscale-like interfaces found",
+                    Modifier.padding(12.dp),
+                    NoticeKind.Success,
+                )
+            }
+
+            val normal = result.interfaces.filterNot { it.suspicious }
+            if (normal.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ExpandRow(
+                    title = "Other interfaces (${normal.size})",
+                    expanded = showOthers,
+                    onToggle = { showOthers = !showOthers },
+                )
+                if (showOthers) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    normal.forEachIndexed { i, r -> InterfaceItem(r, divider = i < normal.size - 1) }
+                }
+            }
         }
 
-        val normal = result.interfaces.filterNot { it.suspicious }
-        if (normal.isNotEmpty()) {
-            Text(
-                text = "Other interfaces (${normal.size}):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            normal.forEach { Text(it.toUiLine()) }
+        errorText?.let {
+            Notice("Network interface scan error: $it", Modifier.padding(12.dp), NoticeKind.Error)
         }
-    }
-
-    if (errorText != null) {
-        Text(
-            text = "Network interface scan error: $errorText",
-            color = Color(0xFFD32F2F),
-        )
     }
 }
 
-private fun InterfaceReport.toUiLine(): String {
-    val flags = buildList {
-        if (isUp) add("up") else add("down")
-        if (isPointToPoint) add("p2p")
-        if (isVirtual) add("virtual")
-        if (isLoopback) add("loopback")
-    }.joinToString(",")
-    val addr = if (addresses.isEmpty()) "no addr" else addresses.joinToString(", ")
-    val reasonSuffix = suspicionReason?.let { " -- $it" } ?: ""
-    return "$name ($displayName) [$flags] mtu=$mtu $addr$reasonSuffix"
-}
-
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StatusBlock(
+private fun InterfaceItem(r: InterfaceReport, divider: Boolean) {
+    val cs = MaterialTheme.colorScheme
+    val ext = MagicTheme.colors
+    AccentRow(accent = if (r.suspicious) cs.error else Color.Transparent, divider = divider) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(r.name, color = cs.onSurface, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = MonoFamily)
+            if (r.displayName.isNotBlank() && r.displayName != r.name) {
+                Text(
+                    "(${r.displayName})",
+                    color = cs.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(vertical = 2.dp),
+        ) {
+            if (r.isUp) Badge("up", container = ext.successContainer, content = ext.onSuccessContainer)
+            else Badge("down", container = ext.surface4, content = cs.onSurfaceVariant)
+            if (r.isPointToPoint) Badge("p2p")
+            if (r.isVirtual) Badge("virtual")
+            if (r.isLoopback) Badge("loopback")
+        }
+        val addr = if (r.addresses.isEmpty()) "no addr" else r.addresses.joinToString(", ")
+        SelectionContainer {
+            Text(
+                text = "mtu=${r.mtu} \u2022 $addr",
+                color = cs.onSurfaceVariant,
+                fontSize = 12.sp,
+                fontFamily = MonoFamily,
+                lineHeight = 17.sp,
+            )
+        }
+        r.suspicionReason?.let {
+            Text(it, color = cs.error, fontSize = 12.sp, lineHeight = 17.sp)
+        }
+    }
+}
+
+// ───────────────────────── State helpers ─────────────────────────
+
+private data class UiStatus(val text: String, val kind: StatusKind)
+
+private fun proxyStatus(
     endpoint: ProxyEndpoint?,
     direct: IpResult,
     viaProxy: IpResult,
     scanning: Boolean,
     hasTested: Boolean,
-) {
-    val (text, color) = when {
-        !hasTested -> "Not tested yet" to Color(0xFF9E9E9E)
-        scanning -> "Scanning..." to Color.Unspecified
-        endpoint == null -> "VPN not found" to Color(0xFFD32F2F)
-        direct.ip != null && viaProxy.ip != null && direct.ip == viaProxy.ip ->
-            "Per-app split disabled" to Color(0xFFFFA000)
-        direct.ip != null && viaProxy.ip != null && direct.ip != viaProxy.ip ->
-            "Detected" to Color(0xFF388E3C)
-        else -> "Unable to compare IPs" to Color(0xFFD32F2F)
-    }
-
-    Text(
-        text = "Status: $text",
-        color = color,
-        style = MaterialTheme.typography.titleMedium,
-    )
-}
-
-@Composable
-private fun XrayApiStatusBlock(
-    hasTested: Boolean,
-    scanning: Boolean,
-    api: XrayApiScanResult?,
-) {
-    val (text, color) = when {
-        !hasTested -> "Xray API: Not tested yet" to Color(0xFF9E9E9E)
-        scanning -> "Xray API: Scanning..." to Color.Unspecified
-        api != null -> "Xray API: Found" to Color(0xFF388E3C)
-        else -> "Xray API: Not found" to Color(0xFFD32F2F)
-    }
-
-    Text(
-        text = text,
-        color = color,
-        style = MaterialTheme.typography.titleMedium,
-    )
+): UiStatus = when {
+    !hasTested -> UiStatus("Not tested yet", StatusKind.Neutral)
+    scanning -> UiStatus("Scanning...", StatusKind.Busy)
+    endpoint == null -> UiStatus("VPN not found", StatusKind.Inactive)
+    direct.ip != null && viaProxy.ip != null && direct.ip == viaProxy.ip ->
+        UiStatus("Per-app split disabled", StatusKind.Warning)
+    direct.ip != null && viaProxy.ip != null && direct.ip != viaProxy.ip ->
+        UiStatus("Detected", StatusKind.Active)
+    else -> UiStatus("Unable to compare IPs", StatusKind.Inactive)
 }
 
 private data class IpResult(
@@ -467,6 +712,13 @@ private data class IpResult(
     val error: String? = null,
     val loading: Boolean = false,
 )
+
+@Composable
+private fun IpResult.color(): Color = when {
+    error != null -> MaterialTheme.colorScheme.error
+    loading || ip == null -> MaterialTheme.colorScheme.onSurfaceVariant
+    else -> MaterialTheme.colorScheme.onSurface
+}
 
 private fun Result<String>.toIpResult(): IpResult {
     return fold(

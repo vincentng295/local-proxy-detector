@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/image/app_icon.png" width="96" alt="Proxy Detector icon"></p>
+
 # Private space and per-app split tunneling bypass POC
 
 ![](https://github.com/runetfreedom/per-app-split-bypass-poc/raw/master/assets/image/preview.png)
